@@ -446,6 +446,7 @@ async fn version_create_inner(
             .files
             .iter()
             .map(|file| VersionFile {
+                id: None,
                 hashes: file
                     .hashes
                     .iter()
