@@ -3,8 +3,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
     paths:
       - .github/workflows/theseus-build.yml
       - 'apps/app/**'
@@ -19,7 +17,7 @@ on:
       sign-windows-binaries:
         description: Sign Windows binaries
         type: boolean
-        default: true
+        default: false
         required: false
 
 jobs:
@@ -78,7 +76,7 @@ jobs:
       - name: ⚙️ Set application version and environment
         shell: bash
         run: |
-          APP_VERSION="$(git describe --tags --always | sed -E 's/-([0-9]+)-(g[0-9a-fA-F]+)$/-canary+\1.\2/')"
+          APP_VERSION="$(git describe --tags --always | sed -E 's/-([0-9]+)-(g[0-9a-fA-F]+)$/-canary+\1.\2.offline/')"
           echo "Setting application version to $APP_VERSION"
           dasel put -f apps/app/Cargo.toml -t string -v "${APP_VERSION#v}" 'package.version'
           dasel put -f packages/app-lib/Cargo.toml -t string -v "${APP_VERSION#v}" 'package.version'
@@ -105,38 +103,16 @@ jobs:
       - name: 🔨 Build macOS app
         run: pnpm --filter=@modrinth/app run tauri build --target universal-apple-darwin --config tauri-release.conf.json
         if: startsWith(matrix.platform, 'macos')
-        env:
-          ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
       - name: 🔨 Build Linux app
         run: pnpm --filter=@modrinth/app run tauri build --config tauri-release.conf.json
         if: startsWith(matrix.platform, 'ubuntu')
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
 
       - name: 🔨 Build Windows app
         run: |
-          [System.Convert]::FromBase64String("$env:DIGICERT_ONE_SIGNER_CLIENT_CERTIFICATE_BASE64") | Set-Content -Path signer-client-cert.p12 -AsByteStream
-          $env:DIGICERT_ONE_SIGNER_CREDENTIALS = "$env:DIGICERT_ONE_SIGNER_API_KEY|$PWD\signer-client-cert.p12|$env:DIGICERT_ONE_SIGNER_CLIENT_CERTIFICATE_PASSWORD"
           $env:JAVA_HOME = "$env:JAVA_HOME_11_X64"
-          pnpm --filter=@modrinth/app run tauri build --config tauri-release.conf.json --verbose --bundles 'nsis,updater'
-          Remove-Item -Path signer-client-cert.p12 -ErrorAction SilentlyContinue
+          pnpm --filter=@modrinth/app run tauri build --config tauri-release.conf.json --verbose --bundles 'nsis'
         if: startsWith(matrix.platform, 'windows')
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          DIGICERT_ONE_SIGNER_API_KEY: ${{ secrets.DIGICERT_ONE_SIGNER_API_KEY }}
-          DIGICERT_ONE_SIGNER_CLIENT_CERTIFICATE_BASE64: ${{ secrets.DIGICERT_ONE_SIGNER_CLIENT_CERTIFICATE_BASE64 }}
-          DIGICERT_ONE_SIGNER_CLIENT_CERTIFICATE_PASSWORD: ${{ secrets.DIGICERT_ONE_SIGNER_CLIENT_CERTIFICATE_PASSWORD }}
 
       - name: 📤 Upload app bundles
         uses: actions/upload-artifact@v4
