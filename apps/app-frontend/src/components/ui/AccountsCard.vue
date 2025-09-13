@@ -14,7 +14,9 @@
 		/>
 		<div class="flex flex-col w-full">
 			<span>{{ selectedAccount ? selectedAccount.profile.name : 'Select account' }}</span>
-			<span class="text-secondary text-xs">Minecraft account</span>
+			<span v-if="selectedAccount" class="text-secondary text-xs">
+				{{ selectedAccount.access_token !== 'offline' ? 'Minecraft account' : 'Offline account' }}
+			</span>
 		</div>
 		<DropdownIcon class="w-5 h-5 shrink-0" />
 	</div>
@@ -40,19 +42,6 @@
 					<TrashIcon />
 				</Button>
 			</div>
-			<div v-else class="logged-out account">
-				<h4>Not signed in</h4>
-				<Button
-					v-tooltip="'Log in'"
-					:disabled="loginDisabled"
-					icon-only
-					color="primary"
-					@click="login()"
-				>
-					<LogInIcon v-if="!loginDisabled" />
-					<SpinnerIcon v-else class="animate-spin" />
-				</Button>
-			</div>
 			<div v-if="displayAccounts.length > 0" class="account-group">
 				<div v-for="account in displayAccounts" :key="account.profile.id" class="account-row">
 					<Button class="option account" @click="setAccount(account)">
@@ -64,23 +53,42 @@
 					</Button>
 				</div>
 			</div>
-			<Button v-if="accounts.length > 0" @click="login()">
-				<PlusIcon />
-				Add account
-			</Button>
+			<div class="logged-out account">
+				<h4 v-if="!selectedAccount">Not signed in</h4>
+				<input type="text" placeholder="Username" v-model="offlineUsername" />
+				<Button
+					v-if="!loginDisabled"
+					v-tooltip="'Play offline'"
+					icon-only
+					color="primary"
+					@click="offlineLogin(offlineUsername)"
+				>
+					<UnplugIcon />
+				</Button>
+				<Button
+					v-tooltip="'Log in via Microsoft'"
+					:disabled="loginDisabled"
+					icon-only
+					color="primary"
+					@click="login()"
+				>
+					<template v-if="!loginDisabled">
+						<LogInIcon v-if="!selectedAccount" />
+						<PlusIcon v-else />
+					</template>
+					<SpinnerIcon v-else class="animate-spin" />
+				</Button>
+			</div>
 		</Card>
 	</transition>
 </template>
 
 <script setup>
-import { DropdownIcon, LogInIcon, PlusIcon, SpinnerIcon, TrashIcon } from '@modrinth/assets'
-import { Avatar, Button, Card, injectNotificationManager } from '@modrinth/ui'
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue'
-
 import { trackEvent } from '@/helpers/analytics'
 import {
 	get_default_user,
 	login as login_flow,
+	offline_login as offline_login_flow,
 	remove_user,
 	set_default_user,
 	users,
@@ -89,6 +97,16 @@ import { process_listener } from '@/helpers/events'
 import { getPlayerHeadUrl } from '@/helpers/rendering/batch-skin-renderer.ts'
 import { get_available_skins } from '@/helpers/skins'
 import { handleSevereError } from '@/store/error.js'
+import {
+	DropdownIcon,
+	LogInIcon,
+	PlusIcon,
+	SpinnerIcon,
+	TrashIcon,
+	UnplugIcon,
+} from '@modrinth/assets'
+import { Avatar, Button, Card, injectNotificationManager } from '@modrinth/ui'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue'
 
 const { handleError } = injectNotificationManager()
 
@@ -104,6 +122,7 @@ const emit = defineEmits(['change'])
 
 const accounts = ref({})
 const loginDisabled = ref(false)
+const offlineUsername = ref('')
 const defaultUser = ref()
 const equippedSkin = ref(null)
 const headUrlCache = ref(new Map())
@@ -184,6 +203,23 @@ async function setAccount(account) {
 async function login() {
 	loginDisabled.value = true
 	const loggedIn = await login_flow().catch(handleSevereError)
+
+	if (loggedIn) {
+		await setAccount(loggedIn)
+		await refreshValues()
+	}
+
+	trackEvent('AccountLogIn')
+	loginDisabled.value = false
+}
+
+async function offlineLogin(username) {
+	if (username.length === 0) {
+		return
+	}
+
+	loginDisabled.value = true
+	const loggedIn = await offline_login_flow(username).catch(handleSevereError)
 
 	if (loggedIn) {
 		await setAccount(loggedIn)

@@ -8,6 +8,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     tauri::plugin::Builder::<R>::new("auth")
         .invoke_handler(tauri::generate_handler![
             login,
+			offline_login,
             remove_user,
             get_default_user,
             set_default_user,
@@ -73,6 +74,12 @@ pub async fn login<R: Runtime>(
 
     window.close()?;
     Ok(None)
+}
+
+#[tauri::command]
+pub async fn offline_login(username: &str) -> Result<Option<Credentials>> {
+	let val = minecraft_auth::offline_login(username).await?;
+    Ok(Some(val))
 }
 
 #[tauri::command]

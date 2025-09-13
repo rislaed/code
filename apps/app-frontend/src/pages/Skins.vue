@@ -317,7 +317,7 @@ await Promise.all([loadCapes(), loadSkins(), loadCurrentUser()])
 		@proceed="deleteSkin"
 	/>
 
-	<div v-if="currentUser" class="p-4 skin-layout">
+	<div v-if="currentUser && currentUser.access_token !== 'offline'" class="p-4 skin-layout">
 		<div class="preview-panel">
 			<h1 class="m-0 text-2xl font-bold flex items-center gap-2">
 				Skins
@@ -446,7 +446,7 @@ await Promise.all([loadCapes(), loadSkins(), loadCurrentUser()])
 			></div>
 
 			<div class="flex flex-col gap-5">
-				<h1 class="text-3xl font-extrabold m-0">Please sign-in</h1>
+				<h1 class="text-3xl font-extrabold m-0">Please sign-in via Microsoft</h1>
 				<p class="text-lg m-0">
 					Please sign into your Minecraft account to use the skin management features of the
 					Modrinth app.

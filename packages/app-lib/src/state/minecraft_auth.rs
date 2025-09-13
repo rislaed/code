@@ -178,6 +178,35 @@ pub async fn login_finish(
     Ok(credentials)
 }
 
+#[tracing::instrument]
+pub async fn offline_login(
+    username: &str,
+    exec: impl sqlx::Executor<'_, Database = sqlx::Sqlite> + Copy,
+) -> crate::Result<Credentials> {
+    let mut credentials = Credentials {
+		offline_profile: MinecraftProfile::default(),
+        access_token: String::from("offline"),
+        refresh_token: String::new(),
+        expires: DateTime::<Utc>::MAX_UTC,
+        active: true,
+    };
+	credentials.offline_profile = MinecraftProfile {
+        id: generate_offline_uuid_from_username(username),
+        name: username.to_owned(),
+        ..credentials.offline_profile
+    };
+
+    credentials.upsert(exec).await?;
+
+    Ok(credentials)
+}
+
+fn generate_offline_uuid_from_username(username: &str) -> Uuid {
+	let namespace_uuid = Uuid::new_v3(&Uuid::NAMESPACE_DNS, "OfflinePlayer:".as_bytes());
+
+    Uuid::new_v3(&namespace_uuid, username.as_bytes())
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Credentials {
     /// The offline profile of the user these credentials are for.
